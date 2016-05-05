@@ -269,7 +269,8 @@ class TournaGUI(QtGui.QWidget):
 
         generated_teams = TeamMaker.shuffle_and_assign_score_bias(
             5,
-            SqlTypes.get_current_round_record_split_players(this_round_id))
+            SqlTypes.get_current_round_record_split_players(this_round_id),
+            2)
 
         # get list that contains a list of 5 SQLType.Players
         count = 0
@@ -283,8 +284,23 @@ class TournaGUI(QtGui.QWidget):
 
         # query again to get the teams to match them to opponents
         teams = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.id==this_round_id).first().teams
+
+        # split teams into ranked based on net win/loss
+        team_score_dict = {}
+        for team in teams:
+            team_net_score = 0
+            for player in team.players:
+                # get net sum of all teams for this team
+                win,loss = SqlTypes.get_player_win_loss(current_round.tournament_id, player.id)
+                team_net_score = team_net_score + win - loss
+            # if value exists, add to existing key
+            if team_net_score in team_score_dict:
+                team_score_dict[team_net_score].append(team)
+            else:
+                team_score_dict[team_net_score] = [team]
+
         if len(teams) > 0:
-            matched_pairs = TeamMaker.shuffle_and_assign(2, teams)
+            matched_pairs = TeamMaker.shuffle_and_assign_score_bias(2, team_score_dict)
             for this_pair in matched_pairs:
                 if len(this_pair) > 1:
                     this_pair[0].opponent_id = this_pair[1].id
@@ -303,7 +319,7 @@ class TournaGUI(QtGui.QWidget):
         for player in this_round.players:
             win,loss = SqlTypes.get_player_win_loss(this_round.tournament_id, player.id)
             win_loss_dict[player.id] = { "player" : player, "win" : win, "loss" : loss}
-                
+            
         TournamentLoader.export_teams_to_file(location, current_teams, win_loss_dict)
 
     def export_players(self, location, round_id):

@@ -22,9 +22,8 @@ def assign_to_teams(team_size, player_list):
 
     return team_list
 
-def shuffle_and_assign_score_bias(team_size, pair_dict):
+def shuffle_and_assign_score_bias(team_size, pair_dict, min_team_count=1):
     sorted_keys = sorted(pair_dict.keys())
-    print sorted_keys
     # fill the total item list with the highest ranked group
     total_item_list = []
     total_team_list = []
@@ -32,7 +31,7 @@ def shuffle_and_assign_score_bias(team_size, pair_dict):
     while True:
         count += 1
         # get at least 2 times the team size so there is a match
-        if len(total_item_list) >= (2 * team_size):
+        if len(total_item_list) >= (min_team_count * team_size):
             shuffle(total_item_list)
             total_team_list += assign_to_teams(team_size, total_item_list)
             print total_team_list
