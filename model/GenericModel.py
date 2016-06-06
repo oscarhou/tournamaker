@@ -57,6 +57,10 @@ class TableModel(QtCore.QAbstractTableModel):
         self.array_dict[role] = rows
         self.layoutChanged.emit()
 
+    def setRow(self, rowIndex, value, role=QtCore.Qt.DisplayRole):
+        self.array_dict[role][rowIndex] = value
+        self.layoutChanged.emit()
+
     def add_row(self, row, role=QtCore.Qt.DisplayRole):
         self.array_dict[role].append(row)
         self.layoutChanged.emit()

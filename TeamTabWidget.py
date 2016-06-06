@@ -36,6 +36,11 @@ class TeamsWidget(QtGui.QWidget):
         self.export_teams_button.setText("Export")
         self.export_teams_button.clicked.connect(self.export_teams)
 
+        # button for managing groups
+        self.manage_groups_button = QtGui.QPushButton()
+        self.manage_groups_button.setText("Groups")
+        self.manage_groups_button.clicked.connect(self.manage_groups_clicked)
+
         # Forms
         self.team_win_loss_widget = TeamWinLossWidget()
         self.team_win_loss_widget.register_win_lose_click(self.team_win_loss_clicked)
@@ -48,6 +53,7 @@ class TeamsWidget(QtGui.QWidget):
         teams_tab_layout.addWidget(self.generate_teams_button, 2, 2)
         teams_tab_layout.addWidget(self.export_teams_button, 3, 2)
         teams_tab_layout.addWidget(self.team_win_loss_widget, 1, 3, 3, 1)
+        teams_tab_layout.addWidget(self.manage_groups_button, 4, 1, 1, 1)
 
         self.setLayout(teams_tab_layout)
         self.show()
@@ -66,6 +72,12 @@ class TeamsWidget(QtGui.QWidget):
 
     def register_team_clicked(self, func):
         self.team_clicked_func = func
+
+    def register_manage_groups_clicked(self, func):
+        self.manage_groups_clicked_func = func
+
+    def manage_groups_clicked(self):
+        self.manage_groups_clicked_func(self.round_id)
 
     def team_win_loss_clicked(self, team_won):
         team_id = self.teams_model.data(

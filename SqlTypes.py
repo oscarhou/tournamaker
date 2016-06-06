@@ -27,6 +27,9 @@ round_players = Table('round_players', Base.metadata,
         Column('player_id', ForeignKey('players.id'), primary_key=True),
         Column('round_id', ForeignKey('rounds.id'), primary_key=True))
 
+group_players = Table('group_players', Base.metadata,
+        Column('player_id', ForeignKey('players.id'), primary_key=True),
+        Column('group_id', ForeignKey('groups.id'), primary_key=True))
 
 class WinLossEnum():
     NotPlayed = 0
@@ -57,12 +60,32 @@ class Player(Base):
         secondary=round_players,
         back_populates='players')
 
+    groups = relationship(
+        'Group',
+        secondary=group_players,
+        back_populates='players')
+
+
     def __eq__(self,other):
         return self.id == other.id
 
     def __repr__(self):
         return "<User(first_name='{}', last_name='{}', nickname='{}', phone={})>".format(
         self.first_name, self.last_name, self.nickname, self.phone)
+
+class Group(Base):
+    __tablename__ = 'groups'
+    id = Column(Integer, primary_key=True)
+    round_id = Column(Integer, ForeignKey('rounds.id'))
+
+    print "setting up players"
+    players = relationship(
+        'Player',
+        secondary=group_players,
+        back_populates='groups')
+
+    def __repr__(self):
+        return "<Group(id='{}', round_id={})>".format(self.id, self.round_id)
 
 class Tournament(Base):
     __tablename__ = 'tournaments'
@@ -195,4 +218,8 @@ def get_current_round_record_split_players(round_id):
             result_dict[score] = [player]
 
     return result_dict
+
+def query_by_round_id(object_type, round_id):
+    return session.query(object_type).filter(object_type.rounds.any(Round.id == round_id))
+
 

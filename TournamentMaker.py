@@ -6,8 +6,9 @@ from TeamTabWidget import TeamsWidget
 from TournamentPlayerWidget import TournamentPlayerWidget
 from my_utility import TournamentLoader
 from Buttons import DialogButton, AddPlayerListButton, CreateTournamentButton
-from CustomDialogs import AddPlayerDialog, EnrollPlayerDialog, MessageDialog
+from CustomDialogs import AddPlayerDialog, EnrollPlayerDialog, MessageDialog, ManageGroupDialog
 from Widgets import PlayerInfoWidget
+from view.CreateGroupView import CreateGroup
 import SqlTypes
 import TeamMaker
 import sys
@@ -128,6 +129,7 @@ class TournaGUI(QtGui.QWidget):
     def initialize_tabs(self):
         self.tab_widget = QtGui.QTabWidget(self)
         self.tab_widget.currentChanged.connect(self.reload_current_round_tab)
+
         self.show_rounds()
 
     def reload_current_round_tab(self):
@@ -146,7 +148,7 @@ class TournaGUI(QtGui.QWidget):
                 self.current_rounds.append(this_round)
                 self.tab_widget.addTab(this_round, "Round {}".format(round_item.round_count))
 
-    # creates a round instance
+    # creates a round instance and sets up the callbacks WHICH SUCK
     def setup_round_tab(self,round_id):
         round_tab = TeamsWidget(round_id=round_id)
         round_tab.register_generate_teams_clicked(self.generate_teams)
@@ -154,6 +156,7 @@ class TournaGUI(QtGui.QWidget):
         round_tab.register_enroll_player_clicked(self.enroll_players)
         round_tab.register_player_export_clicked(self.export_players)
         round_tab.register_win_lose_click(self.update_team_win_loss)
+        round_tab.register_manage_groups_clicked(self.manage_groups)
         return round_tab
 
     # apply SQL changes after enrolling/unenrolling players to a tournament
@@ -184,6 +187,30 @@ class TournaGUI(QtGui.QWidget):
             SqlTypes.session.commit()
 
         self.reload_player_list(round_id)
+
+    def manage_groups(self, round_id):
+        enrolled = SqlTypes.query_by_round_id(SqlTypes.Player, round_id).all()
+        groups = SqlTypes.session.query(SqlTypes.Group).filter(SqlTypes.Group.round_id==round_id).all()
+        for player in enrolled:
+            for group in player.groups:
+                if group.round_id == round_id:
+                    enrolled.remove(player)
+                    break
+
+        groups_dialog = ManageGroupDialog(enrolled, groups)
+        if (groups_dialog.exec_()):
+            groups, groupless_ids = groups_dialog.get_data()
+
+            # if a player does not have a group anymore, remove the group from the player's list
+            for player_id in groupless_ids:
+                this_player = SqlTypes.session.query(SqlTypes.Player).get(player_id)
+                for group in this_player.groups:
+                    if group.round_id == round_id:
+                        this_player.group.remove(group)
+
+            for group in groups:
+                print group
+
 
     def check_has_id(self, check_id, object_list):
         found = False
