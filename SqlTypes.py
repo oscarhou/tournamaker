@@ -70,8 +70,8 @@ class Player(Base):
         return self.id == other.id
 
     def __repr__(self):
-        return "<User(first_name='{}', last_name='{}', nickname='{}', phone={})>".format(
-        self.first_name, self.last_name, self.nickname, self.phone)
+        return "<User(id='{}, 'first_name='{}', last_name='{}', nickname='{}', phone={})>".format(
+        self.id, self.first_name, self.last_name, self.nickname, self.phone)
 
 class Group(Base):
     __tablename__ = 'groups'

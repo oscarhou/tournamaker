@@ -142,15 +142,25 @@ class QModelSwapper(QtCore.QObject):
 
 class ManageGroupDialog(QtGui.QDialog):
     class GroupItem():
-        def __init__(group_id=None, group=[]):
+        def __init__(self,group_id=None, players=[]):
             self.group_id = group_id
-            self.group = group
+            self.players = players
+
+    class PlayerItem():
+        def __init__(self,player_id=None, display_name=""):
+            self.player_id = player_id
+            self.display_name = display_name 
 
     def __init__(self, enrolled_players, groups):
         super(ManageGroupDialog, self).__init__()
 
-        # copy the input groups
-        self.groups_list = list(groups)
+        self.groups_list = []
+        # convert to GroupItems and PlayerItems
+        for group in groups:
+            players = []
+            for player in group.players:
+                players.append(self.PlayerItem(player.id, player.nickname))
+            self.groups_list.append(self.GroupItem(group.id, players))
 
         # show groups
         self.groups_view = QtGui.QTableView()
@@ -205,7 +215,7 @@ class ManageGroupDialog(QtGui.QDialog):
         players_str = ""
         count = 0
         for player in players:
-            players_str += "{}".format(player.nickname)
+            players_str += "{}".format(player.display_name)
             count += 1
             if count < len(item.players):
                 players_str += ','
@@ -223,7 +233,7 @@ class ManageGroupDialog(QtGui.QDialog):
     def set_model_players(self, groupless_players, model):
         display_tuple_list = []
         for player in groupless_players:
-            display_tuple_list.append((player.id, player.nickname))
+            display_tuple_list.append((player.id, player.display_name))
 
         # FIXME: gonna be a bug
         model.add_items(display_tuple_list)
@@ -234,7 +244,7 @@ class ManageGroupDialog(QtGui.QDialog):
         selected = self.groups_model.data(self.groups_view.selectedIndexes()[0], QtCore.Qt.UserRole)
         display_player_tuple = []
         for player in selected.players:
-            display_player_tuple.append((player.id, player.nickname))
+            display_player_tuple.append((player.id, player.display_name))
 
         # update group member list view
         self.group_players_list_model.add_items(display_player_tuple)
@@ -246,7 +256,7 @@ class ManageGroupDialog(QtGui.QDialog):
 
         player_list = []
         for count in xrange(len(current_group_players_id)):
-            player_list.append(SqlTypes.Player(id=current_group_players_id[count], nickname=current_group_players_names[count]))
+            player_list.append(PlayerItem(current_group_players_id[count], current_group_players_names[count]))
 
         selected_data.players = player_list
 
@@ -288,7 +298,7 @@ class ManageGroupDialog(QtGui.QDialog):
 
     def add_new_group(self):
         self.groups_model.add_row(["None"], QtCore.Qt.DisplayRole)
-        self.groups_model.add_row(SqlTypes.Group(), QtCore.Qt.UserRole)
+        self.groups_model.add_row(GroupItem(None), QtCore.Qt.UserRole)
 
     def get_list(self, model, role=QtCore.Qt.DisplayRole):
         id_list = []
@@ -299,4 +309,4 @@ class ManageGroupDialog(QtGui.QDialog):
         return id_list
 
     def get_data(self):
-       return self.groups_list, self.get_id_list(self.enrolled_players_list_model)
+       return self.groups_list, self.get_list(self.enrolled_players_list_model, QtCore.Qt.UserRole)
