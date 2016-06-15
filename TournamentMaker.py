@@ -189,44 +189,10 @@ class TournaGUI(QtGui.QWidget):
         self.reload_player_list(round_id)
 
     def manage_groups(self, round_id):
-        enrolled = SqlTypes.query_by_round_id(SqlTypes.Player, round_id).all()
-        groups = SqlTypes.session.query(SqlTypes.Group).filter(SqlTypes.Group.round_id==round_id).all()
-        for player in enrolled:
-            for group in player.groups:
-                if group.round_id == round_id:
-                    enrolled.remove(player)
-                    break
-
-        groups_dialog = ManageGroupDialog(enrolled, groups)
+        groups_dialog = ManageGroupDialog(round_id)
         if (groups_dialog.exec_()):
             groups, groupless_ids = groups_dialog.get_data()
-
-            # look at groups to see which ones have been added/ modified
-            for group in groups:
-                if group.id:
-                    group_sql = SqlTypes.session.query(SqlTypes.Group).get(group.id)
-                    for player in group.players:
-                        found = False
-                        for sql_player in group_sql.players:
-                            if player.id == sql_player:
-                                found = True
-                                break
-                        if not found:
-                            sql_player = SqlTypes.session.query(SqlTypes.Player).get(player.id)
-                            group_sql.players.append(sql_player)
-                else:
-                    group.round_id = round_id
-                    group.players = []
-                    SqlTypes.session.add(group)
-
-            # if a player does not have a group anymore, remove the group from the player's list
-            for player_id in groupless_ids:
-                this_player = SqlTypes.session.query(SqlTypes.Player).get(player_id)
-                for group in this_player.groups:
-                    if group.round_id == round_id:
-                        this_player.group.remove(group)
-            SqlTypes.session.commit()
-
+        print "succesess"
 
         # TODO: redo this second nest of loops.
         # we should add the new gruops first then 

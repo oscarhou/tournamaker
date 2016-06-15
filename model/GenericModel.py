@@ -32,7 +32,7 @@ class TableModel(QtCore.QAbstractTableModel):
 
         self.header_labels = headers
 
-    def rowCount(self, parent):
+    def rowCount(self,parent=None):
         return len(self.array_dict[QtCore.Qt.DisplayRole])
 
     def columnCount(self, parent):
@@ -64,6 +64,7 @@ class TableModel(QtCore.QAbstractTableModel):
     def add_row(self, row, role=QtCore.Qt.DisplayRole):
         self.array_dict[role].append(row)
         self.layoutChanged.emit()
+        print self.array_dict[role]
 
     def data(self, index, role=QtCore.Qt.DisplayRole):
         if not index.isValid():

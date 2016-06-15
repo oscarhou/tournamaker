@@ -78,7 +78,6 @@ class Group(Base):
     id = Column(Integer, primary_key=True)
     round_id = Column(Integer, ForeignKey('rounds.id'))
 
-    print "setting up players"
     players = relationship(
         'Player',
         secondary=group_players,

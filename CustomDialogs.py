@@ -141,26 +141,21 @@ class QModelSwapper(QtCore.QObject):
         self.swapped.emit()
 
 class ManageGroupDialog(QtGui.QDialog):
-    class GroupItem():
-        def __init__(self,group_id=None, players=[]):
-            self.group_id = group_id
-            self.players = players
-
-    class PlayerItem():
-        def __init__(self,player_id=None, display_name=""):
-            self.player_id = player_id
-            self.display_name = display_name 
-
-    def __init__(self, enrolled_players, groups):
+    def __init__(self, round_id):
         super(ManageGroupDialog, self).__init__()
-
-        self.groups_list = []
-        # convert to GroupItems and PlayerItems
-        for group in groups:
-            players = []
-            for player in group.players:
-                players.append(self.PlayerItem(player.id, player.nickname))
-            self.groups_list.append(self.GroupItem(group.id, players))
+        all_players = SqlTypes.query_by_round_id(SqlTypes.Player, round_id).all()
+        self.groups_list = SqlTypes.session.query(SqlTypes.Group).filter(SqlTypes.Group.round_id==round_id).all()
+        self.round_id = round_id
+        self.enrolled_players = []
+        # only show players in the list that are in the round but do not have a team
+        for player in all_players:
+            found = False
+            for group in player.groups:
+                if group.round_id == round_id:
+                    found = True
+                    break
+            if not found:
+                self.enrolled_players.append(player)
 
         # show groups
         self.groups_view = QtGui.QTableView()
@@ -175,7 +170,7 @@ class ManageGroupDialog(QtGui.QDialog):
         self.enrolled_players_list_model = GenericModel.Generic(self.enrolled_player_list_view)
         self.enrolled_player_list_view.setModel(self.enrolled_players_list_model)
 
-        self.set_model_players(enrolled_players, self.enrolled_players_list_model)
+        self.set_model_players(self.enrolled_players, self.enrolled_players_list_model)
 
         self.ok_button = QtGui.QPushButton("Ok")
         self.cancel_button = QtGui.QPushButton("Cancel")
@@ -212,20 +207,24 @@ class ManageGroupDialog(QtGui.QDialog):
         self.setLayout(h_layout)
 
     def get_group_members_string(self, players):
-        players_str = ""
-        count = 0
-        for player in players:
-            players_str += "{}".format(player.display_name)
-            count += 1
-            if count < len(item.players):
-                players_str += ','
-        return players_str
+        if len(players):
+            players_str = ""
+            count = 0
+            for player in players:
+                players_str += "{}".format(player.nickname)
+                count += 1
+                if count < len(players):
+                    players_str += ','
+        else:
+            players_str = "None"
+
+        # return in a list container since the table model expects a list
+        return [players_str]
 
     def set_groups_table(self):
         groups = []
         for item in self.groups_list:
             groups.append(self.get_group_members_string(item.players))
-
         self.groups_model.setData(groups, role=QtCore.Qt.DisplayRole)
         self.groups_model.setData(self.groups_list, role=QtCore.Qt.UserRole)
         self.groups_view.resizeColumnsToContents()
@@ -233,9 +232,8 @@ class ManageGroupDialog(QtGui.QDialog):
     def set_model_players(self, groupless_players, model):
         display_tuple_list = []
         for player in groupless_players:
-            display_tuple_list.append((player.id, player.display_name))
+            display_tuple_list.append((player, player.nickname))
 
-        # FIXME: gonna be a bug
         model.add_items(display_tuple_list)
 
     # called when a group is clicked, update the group members view
@@ -244,21 +242,17 @@ class ManageGroupDialog(QtGui.QDialog):
         selected = self.groups_model.data(self.groups_view.selectedIndexes()[0], QtCore.Qt.UserRole)
         display_player_tuple = []
         for player in selected.players:
-            display_player_tuple.append((player.id, player.display_name))
+            display_player_tuple.append((player, player.nickname))
 
         # update group member list view
         self.group_players_list_model.add_items(display_player_tuple)
 
     def update_players_models(self):
         selected_data = self.groups_model.data(self.groups_view.selectedIndexes()[0], QtCore.Qt.UserRole)
-        current_group_players_id = self.get_list(self.group_players_list_model, QtCore.Qt.UserRole)
+        current_group_players = self.get_list(self.group_players_list_model, QtCore.Qt.UserRole)
         current_group_players_names = self.get_list(self.group_players_list_model, QtCore.Qt.DisplayRole)
 
-        player_list = []
-        for count in xrange(len(current_group_players_id)):
-            player_list.append(PlayerItem(current_group_players_id[count], current_group_players_names[count]))
-
-        selected_data.players = player_list
+        selected_data.players = current_group_players
 
         # I FUCKING HATE THIS CODE
         players_str = "None"
@@ -273,24 +267,27 @@ class ManageGroupDialog(QtGui.QDialog):
 
         self.groups_model.setRow(self.groups_view.selectedIndexes()[0].row(), [players_str], QtCore.Qt.DisplayRole)
         self.groups_model.setRow(self.groups_view.selectedIndexes()[0].row(), selected_data, QtCore.Qt.UserRole)
-
-
         return
-        # first see if any players have been removed
-        for player in selected.players:
-            found = False
-            for group_player in current_group_players:
-                # if found then do nothing
-                if group_player == player.id:
-                   current_group_players.remove(group_player)
-                   found = True
-                   break 
-
-            # if this player was not found then we have to remove it
-            if not found:
-                selected.players.remove(player)
 
     def ok_clicked(self):
+        groups_list, groupless_players = self.get_data()
+        # if a player does not have a group anymore, remove the group from the player's list
+        for player in groupless_players:
+            for group in player.groups:
+                if group.round_id == self.round_id:
+                    player.groups.remove(group)
+        # check for added groups in the group list and then add them to the db
+        for group in groups_list:
+            # empty lists evaluate to false
+            if not group.players:
+                SqlTypes.session.delete(group)
+                continue
+
+            if group.id == None:
+                SqlTypes.session.add(group)
+
+        SqlTypes.session.commit()
+
         self.accept()
 
     def cancel_clicked(self):
@@ -298,7 +295,10 @@ class ManageGroupDialog(QtGui.QDialog):
 
     def add_new_group(self):
         self.groups_model.add_row(["None"], QtCore.Qt.DisplayRole)
-        self.groups_model.add_row(GroupItem(None), QtCore.Qt.UserRole)
+        self.groups_model.add_row(SqlTypes.Group(round_id=self.round_id), QtCore.Qt.UserRole)
+        # if this is the first group we should select it
+        if self.groups_model.rowCount() == 1:
+            self.groups_view.selectRow(0)
 
     def get_list(self, model, role=QtCore.Qt.DisplayRole):
         id_list = []
