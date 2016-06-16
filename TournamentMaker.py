@@ -143,20 +143,18 @@ class TournaGUI(QtGui.QWidget):
             self.tab_widget.clear()
             rounds = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.tournament_id==self.selected_tournament.id)
 
-            for round_item in sorted(rounds, key=lambda item: item.round_count):
-                this_round = self.setup_round_tab(round_item.id)
+            for index, round_item in enumerate(sorted(rounds, key=lambda item: item.round_count)):
+                this_round = self.setup_round_tab(round_item.id, index == 0)
                 self.current_rounds.append(this_round)
                 self.tab_widget.addTab(this_round, "Round {}".format(round_item.round_count))
 
     # creates a round instance and sets up the callbacks WHICH SUCK
-    def setup_round_tab(self,round_id):
-        round_tab = TeamsWidget(round_id=round_id)
-        round_tab.register_generate_teams_clicked(self.generate_teams)
+    def setup_round_tab(self,round_id, is_first_round):
+        round_tab = TeamsWidget(round_id=round_id, is_first_round=is_first_round)
         round_tab.register_export_clicked(self.export_team_data)
         round_tab.register_enroll_player_clicked(self.enroll_players)
         round_tab.register_player_export_clicked(self.export_players)
         round_tab.register_win_lose_click(self.update_team_win_loss)
-        round_tab.register_manage_groups_clicked(self.manage_groups)
         return round_tab
 
     # apply SQL changes after enrolling/unenrolling players to a tournament
@@ -187,16 +185,6 @@ class TournaGUI(QtGui.QWidget):
             SqlTypes.session.commit()
 
         self.reload_player_list(round_id)
-
-    def manage_groups(self, round_id):
-        groups_dialog = ManageGroupDialog(round_id)
-        if (groups_dialog.exec_()):
-            groups, groupless_ids = groups_dialog.get_data()
-        print "succesess"
-
-        # TODO: redo this second nest of loops.
-        # we should add the new gruops first then 
-        # iterate through all groups to add players to the groups
 
     def check_has_id(self, check_id, object_list):
         found = False
@@ -272,55 +260,6 @@ class TournaGUI(QtGui.QWidget):
 
         self.get_round_tab(this_round_id).teams_reload(id_rows, data_rows)
 
-    def generate_teams(self, this_round_id):
-        current_round = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.id==this_round_id).first()
-        # clear existing teams
-        current_teams = current_round.teams
-
-        for team in current_teams:
-            SqlTypes.session.delete(team)
-
-        generated_teams = TeamMaker.shuffle_and_assign_score_bias(
-            5,
-            SqlTypes.get_current_round_record_split_players(this_round_id),
-            2)
-
-        # get list that contains a list of 5 SQLType.Players
-        count = 0
-        for team in generated_teams:
-            # for each team create a record and add it to the current round
-            count += 1
-            new_team = SqlTypes.Team(name=count, players=team)
-            current_round.teams.append(new_team)
-
-        SqlTypes.session.commit()
-
-        # query again to get the teams to match them to opponents
-        teams = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.id==this_round_id).first().teams
-
-        # split teams into ranked based on net win/loss
-        team_score_dict = {}
-        for team in teams:
-            team_net_score = 0
-            for player in team.players:
-                # get net sum of all teams for this team
-                win,loss = SqlTypes.get_player_win_loss(current_round.tournament_id, player.id)
-                team_net_score = team_net_score + win - loss
-            # if value exists, add to existing key
-            if team_net_score in team_score_dict:
-                team_score_dict[team_net_score].append(team)
-            else:
-                team_score_dict[team_net_score] = [team]
-
-        if len(teams) > 0:
-            matched_pairs = TeamMaker.shuffle_and_assign_score_bias(2, team_score_dict)
-            for this_pair in matched_pairs:
-                if len(this_pair) > 1:
-                    this_pair[0].opponent_id = this_pair[1].id
-                    this_pair[1].opponent_id = this_pair[0].id
-            SqlTypes.session.commit()
-
-        self.reload_teams(this_round_id)
 
     def export_team_data(self, location, round_id):
         current_teams = SqlTypes.sql_query(
@@ -332,7 +271,7 @@ class TournaGUI(QtGui.QWidget):
         for player in this_round.players:
             win,loss = SqlTypes.get_player_win_loss(this_round.tournament_id, player.id)
             win_loss_dict[player.id] = { "player" : player, "win" : win, "loss" : loss}
-            
+
         TournamentLoader.export_teams_to_file(location, current_teams, win_loss_dict)
 
     def export_players(self, location, round_id):

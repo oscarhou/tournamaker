@@ -2,9 +2,11 @@ from PyQt4 import QtGui, QtCore
 from model import GenericModel
 from TournamentPlayerWidget import TournamentPlayerWidget
 from Widgets import TeamWinLossWidget
+from CustomDialogs import ManageGroupDialog
+from TeamMaker import generate_teams, match_teams
 
 class TeamsWidget(QtGui.QWidget):
-    def __init__(self, model=None, parent=None, round_id=None):
+    def __init__(self, model=None, parent=None, round_id=None, is_first_round=True):
         super(TeamsWidget, self).__init__()
 
         self.teams_count = 0
@@ -28,8 +30,12 @@ class TeamsWidget(QtGui.QWidget):
 
         #button for creating teams
         self.generate_teams_button = QtGui.QPushButton()
-        self.generate_teams_button.setText("Generate Teams")
-        self.generate_teams_button.clicked.connect(self.generate_teams)
+        if is_first_round:
+            self.generate_teams_button.setText("Generate Teams")
+            self.generate_teams_button.clicked.connect(lambda: generate_teams(self.round_id))
+        else:
+            self.generate_teams_button.setText("Match Teams")
+            self.generate_teams_button.clicked.connect(lambda: match_teams(self.round_id))
 
         #button for creating teams
         self.export_teams_button = QtGui.QPushButton()
@@ -73,11 +79,8 @@ class TeamsWidget(QtGui.QWidget):
     def register_team_clicked(self, func):
         self.team_clicked_func = func
 
-    def register_manage_groups_clicked(self, func):
-        self.manage_groups_clicked_func = func
-
     def manage_groups_clicked(self):
-        self.manage_groups_clicked_func(self.round_id)
+        ManageGroupDialog(self.round_id).exec_()
 
     def team_win_loss_clicked(self, team_won):
         team_id = self.teams_model.data(

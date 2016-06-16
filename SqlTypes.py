@@ -35,7 +35,11 @@ class WinLossEnum():
     NotPlayed = 0
     Win = 1
     Lose = 2
-    
+
+class GroupPlayerEnum():
+    Group = 0
+    Player = 1
+
 class Player(Base):
     __tablename__ = 'players'
 
@@ -206,17 +210,62 @@ def get_player_win_loss(this_tournament_id, player_id):
     return (wins, losses)
 
 def get_current_round_record_split_players(round_id):
-    result_dict = {}
+    result_players_dict = {}
+    grouped_players_dict = {}
+    # first get round data
     this_round = session.query(Round).get(round_id)
+    # for each player see if they are in a group
     for player in this_round.players:
+        # check if this player is in a group
+        # if they are, just continue
+        if (session.query(Group).filter(Group.round_id==this_round.id).filter(Group.players.any(id=player.id)).all()):
+            continue
+
         wins, losses = get_player_win_loss(this_round.tournament_id, player.id)
         score = wins - losses
-        if score in result_dict:
-            result_dict[score].append(player)
+        if score in result_players_dict:
+            result_players_dict[score].append(player)
         else:
-            result_dict[score] = [player]
+            result_players_dict[score] = [player]
 
-    return result_dict
+    # now get the groups
+    groups = session.query(Group).filter(Group.round_id==this_round.id).all()
+    for group in groups:
+        group_score = 0
+        # find the highest scoring player and that will represent the group win loss
+        for player in group.players:
+            wins, losses = get_player_win_loss(this_round.tournament_id, player.id)
+            if group_score < wins - losses:
+                group_score = wins - losses
+        # after iterating, the group score will be determined
+        if score in grouped_players_dict:
+            grouped_players_dict[score].append(group)
+        else:
+            grouped_players_dict[score] = [group]
+
+    return result_players_dict, grouped_players_dict
+
+def get_round_players_groups_tuple(round_id):
+    result_players = []
+    grouped_players = []
+    # first get round data
+    this_round = session.query(Round).get(round_id)
+    # for each player see if they are in a group
+    for player in this_round.players:
+        # check if this player is in a group
+        # if they are, just continue
+        if (session.query(Group).filter(Group.round_id==this_round.id).filter(Group.players.any(id=player.id)).all()):
+            continue
+
+        result_players.append(player)
+
+    # now get the groups
+    groups = session.query(Group).filter(Group.round_id==this_round.id).all()
+    for group in groups:
+        grouped_players.append(group)
+
+    return result_players, grouped_players
+
 
 def query_by_round_id(object_type, round_id):
     return session.query(object_type).filter(object_type.rounds.any(Round.id == round_id))
