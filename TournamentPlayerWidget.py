@@ -47,3 +47,6 @@ class TournamentPlayerWidget(QtGui.QWidget):
         name = QtGui.QFileDialog.getSaveFileName(self, 'Export file', 'export.txt')
         if name:
             self.export_func(name, self.round_id)
+
+    def disable(self):
+        self.enroll_player_button.setEnabled(False)

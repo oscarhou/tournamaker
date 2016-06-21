@@ -141,10 +141,13 @@ class TournaGUI(QtGui.QWidget):
         if self.selected_tournament:
             self.current_rounds = []
             self.tab_widget.clear()
-            rounds = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.tournament_id==self.selected_tournament.id)
+            rounds = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.tournament_id==self.selected_tournament.id).all()
 
             for index, round_item in enumerate(sorted(rounds, key=lambda item: item.round_count)):
                 this_round = self.setup_round_tab(round_item.id, index == 0)
+                if index < len(rounds) - 1:
+                    this_round.disable_buttons()
+
                 self.current_rounds.append(this_round)
                 self.tab_widget.addTab(this_round, "Round {}".format(round_item.round_count))
 

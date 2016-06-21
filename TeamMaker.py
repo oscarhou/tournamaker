@@ -35,28 +35,29 @@ def shuffle_and_assign_score_bias(team_size, players_tuple, min_team_count=1):
     while len(groups) or len(players):
         # if we have enough players for a team, store the completed team
         # and start a new team
-        if len(total_item_list) >= team_size:
-            total_team_list.append(list(total_item_list))
-            total_item_list = []
 
         add_group = None
         for group in groups:
             # if the current group has less than or equal to the number of players
             # needed to complete the team, remove group and continue
-            if len(group.players) <= team_size - len(total_item_list):
+            if len(group.players) <= (team_size - len(total_item_list)):
                 total_item_list += group.players
-                add_group = group 
+                add_group = group
+                groups.remove(add_group)
                 break
 
-        # if we found a group, then that means we've added so just continue
-        if add_group:
-            groups.remove(add_group)
-            continue
-
         # if no group was found, resort to adding individual players to fill the team
-        while len(total_item_list) < team_size and len(players):
-            total_item_list.append(players.pop())
+        if add_group == None:
+            while len(total_item_list) < team_size and len(players):
+                total_item_list.append(players.pop())
 
+        if len(total_item_list) >= team_size:
+            total_team_list.append(list(total_item_list))
+            total_item_list = []
+
+
+
+    print total_team_list
     return total_team_list
 
 def generate_teams(this_round_id):
@@ -79,6 +80,8 @@ def generate_teams(this_round_id):
         count += 1
         new_team = SqlTypes.Team(name=count, players=team)
         current_round.teams.append(new_team)
+
+
 
     SqlTypes.session.commit()
 

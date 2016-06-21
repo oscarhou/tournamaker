@@ -188,6 +188,8 @@ def add_new_round(round_tournament_id):
             .filter(Round.round_count==rounds).first()
 
         new_round.players = list(prev_round.players)
+        new_round.teams = list(prev_round.teams)
+
     session.add(new_round)
     session.commit()
 

@@ -12,6 +12,7 @@ class TeamsWidget(QtGui.QWidget):
         self.teams_count = 0
         self.get_teams_func = None
         self.export_func = None
+        self.manage_groups_button = None
         self.round_id = round_id
         teams_tab_layout = QtGui.QGridLayout(self)
 
@@ -33,6 +34,9 @@ class TeamsWidget(QtGui.QWidget):
         if is_first_round:
             self.generate_teams_button.setText("Generate Teams")
             self.generate_teams_button.clicked.connect(lambda: generate_teams(self.round_id))
+            self.manage_groups_button = QtGui.QPushButton()
+            self.manage_groups_button.setText("Groups")
+            self.manage_groups_button.clicked.connect(self.manage_groups_clicked)
         else:
             self.generate_teams_button.setText("Match Teams")
             self.generate_teams_button.clicked.connect(lambda: match_teams(self.round_id))
@@ -41,11 +45,6 @@ class TeamsWidget(QtGui.QWidget):
         self.export_teams_button = QtGui.QPushButton()
         self.export_teams_button.setText("Export")
         self.export_teams_button.clicked.connect(self.export_teams)
-
-        # button for managing groups
-        self.manage_groups_button = QtGui.QPushButton()
-        self.manage_groups_button.setText("Groups")
-        self.manage_groups_button.clicked.connect(self.manage_groups_clicked)
 
         # Forms
         self.team_win_loss_widget = TeamWinLossWidget()
@@ -59,10 +58,15 @@ class TeamsWidget(QtGui.QWidget):
         teams_tab_layout.addWidget(self.generate_teams_button, 2, 2)
         teams_tab_layout.addWidget(self.export_teams_button, 3, 2)
         teams_tab_layout.addWidget(self.team_win_loss_widget, 1, 3, 3, 1)
-        teams_tab_layout.addWidget(self.manage_groups_button, 4, 1, 1, 1)
+        if self.manage_groups_button:
+            teams_tab_layout.addWidget(self.manage_groups_button, 4, 1, 1, 1)
 
         self.setLayout(teams_tab_layout)
         self.show()
+
+    def disable_buttons(self):
+        self.generate_teams_button.setEnabled(False)
+        self.players_widget.disable()
 
     def players_reload(self, data):
         self.players_widget.reload(data)
