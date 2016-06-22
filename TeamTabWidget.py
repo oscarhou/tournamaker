@@ -3,6 +3,7 @@ from model import GenericModel
 from TournamentPlayerWidget import TournamentPlayerWidget
 from Widgets import TeamWinLossWidget
 from CustomDialogs import ManageGroupDialog
+import SqlTypes
 from TeamMaker import generate_teams, match_teams
 
 class TeamsWidget(QtGui.QWidget):
@@ -14,6 +15,7 @@ class TeamsWidget(QtGui.QWidget):
         self.export_func = None
         self.manage_groups_button = None
         self.round_id = round_id
+        self.is_first_round = is_first_round
         teams_tab_layout = QtGui.QGridLayout(self)
 
         #teams model
@@ -31,15 +33,17 @@ class TeamsWidget(QtGui.QWidget):
 
         #button for creating teams
         self.generate_teams_button = QtGui.QPushButton()
+        self.manage_groups_button = QtGui.QPushButton()
         if is_first_round:
             self.generate_teams_button.setText("Generate Teams")
             self.generate_teams_button.clicked.connect(lambda: generate_teams(self.round_id))
-            self.manage_groups_button = QtGui.QPushButton()
-            self.manage_groups_button.setText("Groups")
+            self.manage_groups_button.setText("Manage Groups")
             self.manage_groups_button.clicked.connect(self.manage_groups_clicked)
         else:
             self.generate_teams_button.setText("Match Teams")
             self.generate_teams_button.clicked.connect(lambda: match_teams(self.round_id))
+            self.manage_groups_button.setText("Manage Teams")
+            self.manage_groups_button.clicked.connect(self.manage_groups_clicked)
 
         #button for creating teams
         self.export_teams_button = QtGui.QPushButton()
@@ -67,6 +71,8 @@ class TeamsWidget(QtGui.QWidget):
     def disable_buttons(self):
         self.generate_teams_button.setEnabled(False)
         self.players_widget.disable()
+        self.team_win_loss_widget.disable(True)
+        self.manage_groups_button.setEnabled(False)
 
     def players_reload(self, data):
         self.players_widget.reload(data)
@@ -84,7 +90,34 @@ class TeamsWidget(QtGui.QWidget):
         self.team_clicked_func = func
 
     def manage_groups_clicked(self):
-        ManageGroupDialog(self.round_id).exec_()
+        all_players = SqlTypes.query_by_round_id(SqlTypes.Player, self.round_id).all()
+        groups_list = None
+        enrolled_players = []
+        creation_func = None
+        if self.is_first_round:
+            groups_list = SqlTypes.session.query(SqlTypes.Group).filter(SqlTypes.Group.round_id==self.round_id).all()
+            # only show players in the list that are in the round but do not have a team
+            for player in all_players:
+                found = False
+                for group in player.groups:
+                    if group.round_id == self.round_id:
+                        found = True
+                        break
+                if not found:
+                    enrolled_players.append(player)
+            creation_func = lambda x: SqlTypes.Group(round_id=x)
+        else:
+            groups_list = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.rounds.any(id=self.round_id)).all()
+            for player in all_players:
+                found = False
+                for team in player.teams:
+                    # if player is on a team that exists in this round
+                    if [ x for x in groups_list if x.id == team.id ]:
+                        found = True
+                        break
+                if not found:
+                    enrolled_players.append(player)
+        ManageGroupDialog(creation_func, self.round_id, groups_list, enrolled_players).exec_()
 
     def team_win_loss_clicked(self, team_won):
         team_id = self.teams_model.data(

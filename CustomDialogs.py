@@ -141,22 +141,12 @@ class QModelSwapper(QtCore.QObject):
         self.swapped.emit()
 
 class ManageGroupDialog(QtGui.QDialog):
-    def __init__(self, round_id):
+    def __init__(self, item_create_func, round_id, groups, ungrouped_players):
         super(ManageGroupDialog, self).__init__()
-        all_players = SqlTypes.query_by_round_id(SqlTypes.Player, round_id).all()
-        self.groups_list = SqlTypes.session.query(SqlTypes.Group).filter(SqlTypes.Group.round_id==round_id).all()
+        self.groups_list = groups
         self.round_id = round_id
-        self.enrolled_players = []
-        # only show players in the list that are in the round but do not have a team
-        for player in all_players:
-            found = False
-            for group in player.groups:
-                if group.round_id == round_id:
-                    found = True
-                    break
-            if not found:
-                self.enrolled_players.append(player)
-
+        self.enrolled_players = ungrouped_players
+        self.create_func = item_create_func
         # show groups
         self.groups_view = QtGui.QTableView()
         self.groups_model = GenericModel.TableModel(["Players"])
@@ -180,6 +170,9 @@ class ManageGroupDialog(QtGui.QDialog):
         self.cancel_button.clicked.connect(self.cancel_clicked)
         self.create_group_button = QtGui.QPushButton("Create Group")
         self.create_group_button.clicked.connect(self.add_new_group)
+        if not self.create_func:
+            self.create_group_button.setEnabled(False)
+
 
         # show players in groups
         self.group_players_list = QtGui.QListView(self)
@@ -188,7 +181,7 @@ class ManageGroupDialog(QtGui.QDialog):
 
         # swapper
         self.swapper = QModelSwapper(self.enrolled_players_list_model, self.group_players_list_model)
-        self.enrolled_player_list_view.doubleClicked.connect(self.swapper.first_double_clicked)
+        self.enrolled_player_list_view.doubleClicked.connect(self.players_list_clicked_handler)
         self.group_players_list.doubleClicked.connect(self.swapper.second_double_clicked)
         self.swapper.swapped.connect(self.update_players_models)
 
@@ -205,6 +198,17 @@ class ManageGroupDialog(QtGui.QDialog):
         v_layout.addWidget(self.cancel_button)
         h_layout.addLayout(v_layout)
         self.setLayout(h_layout)
+
+    # when players list is clicked we need to check the 
+    # groups list to see if it currently has room for another player
+    def players_list_clicked_handler(self, model_index):
+        # magic fuckin' number
+        if self.group_players_list_model.rowCount() < 5:
+            self.swapper.first_double_clicked(model_index)
+        else:
+            box = QtGui.QMessageBox()
+            box.setText("Max 5 players a team!")
+            box.exec_()
 
     def get_group_members_string(self, players):
         if len(players):
@@ -295,7 +299,7 @@ class ManageGroupDialog(QtGui.QDialog):
 
     def add_new_group(self):
         self.groups_model.add_row(["None"], QtCore.Qt.DisplayRole)
-        self.groups_model.add_row(SqlTypes.Group(round_id=self.round_id), QtCore.Qt.UserRole)
+        self.groups_model.add_row(self.create_func(self.round_id), QtCore.Qt.UserRole)
         # if this is the first group we should select it
         if self.groups_model.rowCount() == 1:
             self.groups_view.selectRow(0)

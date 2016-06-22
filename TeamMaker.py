@@ -25,6 +25,7 @@ def assign_to_teams(team_size, player_list):
 def shuffle_and_assign_score_bias(team_size, players_tuple, min_team_count=1):
     groups = sorted(players_tuple[1], key=lambda x: len(x.players), reverse=True)
     players = players_tuple[0]
+    shuffle(players)
 
     # fill the total item list with the highest ranked group
     total_item_list = []
@@ -55,9 +56,6 @@ def shuffle_and_assign_score_bias(team_size, players_tuple, min_team_count=1):
             total_team_list.append(list(total_item_list))
             total_item_list = []
 
-
-
-    print total_team_list
     return total_team_list
 
 def generate_teams(this_round_id):
@@ -80,8 +78,6 @@ def generate_teams(this_round_id):
         count += 1
         new_team = SqlTypes.Team(name=count, players=team)
         current_round.teams.append(new_team)
-
-
 
     SqlTypes.session.commit()
 

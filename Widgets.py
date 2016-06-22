@@ -63,3 +63,7 @@ class TeamWinLossWidget(QtGui.QWidget):
     def win_click(self):
         self.clicked_func(True)
 
+    def disable(self, disable):
+        self.win_button.setEnabled(not disable)
+        self.lose_button.setEnabled(not disable)
+
