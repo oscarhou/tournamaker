@@ -19,9 +19,10 @@ team_players = Table('team_players', Base.metadata,
         Column('team_id', ForeignKey('teams.id'), primary_key=True),
         Column('player_id', ForeignKey('players.id'), primary_key=True))
 
-team_rounds = Table('team_rounds', Base.metadata,
-        Column('team_id', ForeignKey('teams.id'), primary_key=True),
-        Column('round_id', ForeignKey('rounds.id'), primary_key=True))
+#team_rounds = Table('team_rounds', Base.metadata,
+#        Column('team_id', ForeignKey('teams.id'), primary_key=True),
+#        Column('round_id', ForeignKey('rounds.id'), primary_key=True),
+#        Column('win_loss', Integer))
 
 round_players = Table('round_players', Base.metadata,
         Column('player_id', ForeignKey('players.id'), primary_key=True),
@@ -112,14 +113,24 @@ class Tournament(Base):
         #return "<Tournament(name='{}', date='{}')>".format(self.name, self.date)
         return "<Tournament(name='{}')>".format(self.name)
 
+class TeamRounds(Base):
+    __tablename__ = 'team_rounds'
+    id = Column(Integer, primary_key=True)
+    round_id = Column(Integer, ForeignKey('rounds.id'))
+    team_id = Column(Integer, ForeignKey('teams.id'))
+    opponent_id = Column(Integer, default=None)
+    win_loss = Column(Integer, default=WinLossEnum.NotPlayed)
+
+    def __repr__(self):
+        #return "<Tournament(name='{}', date='{}')>".format(self.name, self.date)
+        return "<TeamRounds(team='{}', round='{}', win_loss='{}')>".format(self.team_id, self.round_id, self.win_loss)
+
 class Team(Base):
     __tablename__ = 'teams'
 
     id = Column(Integer, primary_key=True)
     name = Column(String)
     tournament_id = Column(Integer, ForeignKey('tournaments.id'))
-    opponent_id = Column(Integer, ForeignKey('teams.id'))
-    win_loss_status = Column(Integer, default=0)
 
     tournaments = relationship(
         'Tournament',
@@ -132,7 +143,7 @@ class Team(Base):
 
     rounds = relationship(
         'Round',
-        secondary=team_rounds,
+        secondary=TeamRounds.__table__,
         back_populates='teams')
 
 
@@ -153,7 +164,7 @@ class Round(Base):
 
     teams = relationship(
         'Team',
-        secondary=team_rounds,
+        secondary=TeamRounds.__table__,
         back_populates='rounds')
 
     def __repr__(self):
@@ -193,83 +204,16 @@ def add_new_round(round_tournament_id):
     session.add(new_round)
     session.commit()
 
-def get_player_win_loss(this_tournament_id, player_id):
-    # get player data
-    player = get_by_id(Player, player_id)
-    #get rounds this player played
-    rounds = session.query(Round).filter(Round.tournament_id==this_tournament_id).filter(Round.players.any(id=player_id)).all()
-    wins = 0
-    losses = 0
-    for this_round in rounds:
-        # count this player's score
-        for team in this_round.teams:
-            if player in team.players:
-                if team.win_loss_status == WinLossEnum.Win:
-                    wins += 1
-                elif team.win_loss_status == WinLossEnum.Lose:
-                    losses += 1
-                break
-    return (wins, losses)
+def get_teams_by_tournament_id(tournament_id):
+    return session.query(Team).filter(Team.tournament_id==tournament_id).all()
 
-def get_current_round_record_split_players(round_id):
-    result_players_dict = {}
-    grouped_players_dict = {}
-    # first get round data
-    this_round = session.query(Round).get(round_id)
-    # for each player see if they are in a group
-    for player in this_round.players:
-        # check if this player is in a group
-        # if they are, just continue
-        if (session.query(Group).filter(Group.round_id==this_round.id).filter(Group.players.any(id=player.id)).all()):
-            continue
+def get_rounds_by_tournament_id(tournament_id):
+    return session.query(Round).filter(Round.tournament_id==tournament_id).all()
 
-        wins, losses = get_player_win_loss(this_round.tournament_id, player.id)
-        score = wins - losses
-        if score in result_players_dict:
-            result_players_dict[score].append(player)
-        else:
-            result_players_dict[score] = [player]
+def get_teams_by_round_id(round_id):
+    return session.query(Team).filter(Team.round_id==round_id).all()
 
-    # now get the groups
-    groups = session.query(Group).filter(Group.round_id==this_round.id).all()
-    for group in groups:
-        group_score = 0
-        # find the highest scoring player and that will represent the group win loss
-        for player in group.players:
-            wins, losses = get_player_win_loss(this_round.tournament_id, player.id)
-            if group_score < wins - losses:
-                group_score = wins - losses
-        # after iterating, the group score will be determined
-        if score in grouped_players_dict:
-            grouped_players_dict[score].append(group)
-        else:
-            grouped_players_dict[score] = [group]
-
-    return result_players_dict, grouped_players_dict
-
-def get_round_players_groups_tuple(round_id):
-    result_players = []
-    grouped_players = []
-    # first get round data
-    this_round = session.query(Round).get(round_id)
-    # for each player see if they are in a group
-    for player in this_round.players:
-        # check if this player is in a group
-        # if they are, just continue
-        if (session.query(Group).filter(Group.round_id==this_round.id).filter(Group.players.any(id=player.id)).all()):
-            continue
-
-        result_players.append(player)
-
-    # now get the groups
-    groups = session.query(Group).filter(Group.round_id==this_round.id).all()
-    for group in groups:
-        grouped_players.append(group)
-
-    return result_players, grouped_players
-
-
-def query_by_round_id(object_type, round_id):
-    return session.query(object_type).filter(object_type.rounds.any(Round.id == round_id))
+def get_team_rounds_by_round_id(round_id):
+    return session.query(TeamRounds).filter(TeamRounds.round_id==round_id).all()
 
 

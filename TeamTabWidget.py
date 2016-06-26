@@ -122,11 +122,19 @@ class TeamsWidget(QtGui.QWidget):
     def team_win_loss_clicked(self, team_won):
         team_id = self.teams_model.data(
             self.teams_view.selectedIndexes()[0], QtCore.Qt.UserRole)
+        team = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.id==team_id).first()
+        match = SqlTypes.get_win_loss(team.id, self.round_id)
 
-        self.team_win_loss_handler_func(team_id, team_won)
+        this_team_win_loss= SqlTypes.get_win_loss(team_id, self.round_id)
+        opponent_team_win_loss= SqlTypes.get_win_loss(match.opponent_id, self.round_id)
 
-    def register_win_lose_click(self, func):
-        self.team_win_loss_handler_func = func
+        if team_won:
+            this_team_win_loss.win_loss = SqlTypes.WinLossEnum.Win
+            opponent_team_win_loss.win_loss = SqlTypes.WinLossEnum.Lose
+        else:
+            this_team_win_loss.win_loss = SqlTypes.WinLossEnum.Lose
+            opponent_team_win_loss.win_loss = SqlTypes.WinLossEnum.Win
+        SqlTypes.session.commit()
 
     def team_clicked(self, model_index):
         team_id = self.teams_model.data(
@@ -142,19 +150,6 @@ class TeamsWidget(QtGui.QWidget):
     def update_team_win_loss(self, opponent):
         self.team_win_loss_widget.set_opponent(opponent)
 
-    def generate_teams(self):
-        if self.teams_count > 0:
-            quit_msg = "Are you sure you want to regenerate teams?"
-            reply = QtGui.QMessageBox.question(self, 'Message',
-                quit_msg, QtGui.QMessageBox.Yes, QtGui.QMessageBox.No)
-            if reply == QtGui.QMessageBox.Yes:
-                self.get_teams_func(self.round_id)
-        else:
-          self.get_teams_func(self.round_id)
-
-    def register_generate_teams_clicked(self, func):
-        self.get_teams_func = func
-
     def register_export_clicked(self, func):
         self.export_func = func
 
@@ -162,5 +157,4 @@ class TeamsWidget(QtGui.QWidget):
         name = QtGui.QFileDialog.getSaveFileName(self, 'Export file', 'teams.html')
         if name:
             self.export_func(name, self.round_id)
-
 

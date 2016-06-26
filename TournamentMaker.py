@@ -12,7 +12,7 @@ from view.CreateGroupView import CreateGroup
 import SqlTypes
 import TeamMaker
 import sys
-
+import MatchHelpers
 class TournaGUI(QtGui.QWidget):
     def __init__(self):
         super(TournaGUI, self).__init__()
@@ -124,7 +124,7 @@ class TournaGUI(QtGui.QWidget):
         self.current_player_id = data
         self.player_info.set_player_data(
             SqlTypes.session.query(SqlTypes.Player).filter(SqlTypes.Player.id == data).first())
-        SqlTypes.get_player_win_loss(self.selected_tournament.id, self.current_player_id)
+        MatchHelpers.get_player_win_loss(self.selected_tournament.id, self.current_player_id)
 
     def initialize_tabs(self):
         self.tab_widget = QtGui.QTabWidget(self)
@@ -157,7 +157,6 @@ class TournaGUI(QtGui.QWidget):
         round_tab.register_export_clicked(self.export_team_data)
         round_tab.register_enroll_player_clicked(self.enroll_players)
         round_tab.register_player_export_clicked(self.export_players)
-        round_tab.register_win_lose_click(self.update_team_win_loss)
         return round_tab
 
     # apply SQL changes after enrolling/unenrolling players to a tournament
@@ -242,8 +241,13 @@ class TournaGUI(QtGui.QWidget):
         for team in current_teams:
             team_list_string = ""
 
-            opponent = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.id==team.opponent_id).first()
-            opponent_name = opponent.name if opponent else ""
+            team_match = MatchHelpers.get_win_loss(team.id, current_round.id)
+            opponent_name = ""
+            if (team_match.opponent_id):
+                opponent = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.id==team_match.opponent_id).first()
+                opponent_name = opponent.name
+
+            team_round = MatchHelpers.get_win_loss(team.id, this_round_id)
 
             # make the team list string
             for member in team.players:
@@ -253,9 +257,9 @@ class TournaGUI(QtGui.QWidget):
                 team_list_string += member.nickname
 
             win_loss_str = "N/A"
-            if team.win_loss_status == SqlTypes.WinLossEnum.Win:
+            if team_round.win_loss == SqlTypes.WinLossEnum.Win:
                 win_loss_str = "Win"
-            elif team.win_loss_status == SqlTypes.WinLossEnum.Lose:
+            elif team_round.win_loss == SqlTypes.WinLossEnum.Lose:
                 win_loss_str = "Lose"
 
             data_rows.append([team.name, team_list_string, opponent_name, win_loss_str])
@@ -341,20 +345,18 @@ class TournaGUI(QtGui.QWidget):
             SqlTypes.add_new_round(tournament.id)
 
     def add_new_round_to_selected_tournament(self):
-        SqlTypes.add_new_round(self.selected_tournament.id)
+        round_latest = max(SqlTypes.get_rounds_by_tournament_id(self.selected_tournament.id), key= lambda x: x.round_count)
+        current_round_matches = SqlTypes.get_team_rounds_by_round_id(round_latest.id)
+        unplayed_matches = 0
+        for match in current_round_matches:
+            if match.win_loss == SqlTypes.WinLossEnum.NotPlayed:
+                unplayed_matches += 1
 
-    def update_team_win_loss(self, team_id, team_won):
-        team = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.id==team_id).first()
-        opponent = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.id==team.opponent_id).first()
-        if team_won:
-            team.win_loss_status = SqlTypes.WinLossEnum.Win
-            opponent.win_loss_status = SqlTypes.WinLossEnum.Lose
-        else:
-            team.win_loss_status = SqlTypes.WinLossEnum.Lose
-            opponent.win_loss_status = SqlTypes.WinLossEnum.Win
-        SqlTypes.session.add(team)
-        SqlTypes.session.add(opponent)
-        SqlTypes.session.commit()
+            if unplayed_matches > 1:
+                MessageDialog(self, "Match results not updated", QtGui.QMessageBox.Ok)
+                return
+
+        SqlTypes.add_new_round(self.selected_tournament.id)
 
 def main():
     app = QtGui.QApplication(sys.argv)

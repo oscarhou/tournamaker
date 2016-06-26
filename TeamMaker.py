@@ -1,5 +1,6 @@
 from random import shuffle
 import SqlTypes
+import MatchHelpers
 
 def assign_to_teams(team_size, player_list):
     team_list = []
@@ -76,45 +77,38 @@ def generate_teams(this_round_id):
     for team in generated_teams:
         # for each team create a record and add it to the current round
         count += 1
-        new_team = SqlTypes.Team(name=count, players=team)
+        new_team = SqlTypes.Team(name=count, players=team, tournament_id=current_round.tournament_id)
         current_round.teams.append(new_team)
+        SqlTypes.session.add(new_team)
 
     SqlTypes.session.commit()
 
     match_teams(this_round_id)
 
 def match_teams(this_round_id):
-    current_round = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.id==this_round_id).first()
-    # query again to get the teams to match them to opponents
-    teams = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.id==this_round_id).first().teams
-
-    # split teams into ranked based on net win/loss
-    team_score_dict = {}
-    for team in teams:
-        team_net_score = 0
-        for player in team.players:
-            # get net sum of all teams for this team
-            win,loss = SqlTypes.get_player_win_loss(current_round.tournament_id, player.id)
-            team_net_score = team_net_score + win - loss
-        # if value exists, add to existing key
-        if team_net_score in team_score_dict:
-            team_score_dict[team_net_score].append(team)
+    this_round = SqlTypes.get_by_id(SqlTypes.Round, this_round_id)
+    matched_pairs = pair_teams(MatchHelpers.get_teams_grouped_by_wins(this_round.tournament_id))
+    for this_pair in matched_pairs:
+        first_team = MatchHelpers.get_win_loss(this_pair[0].id, this_round.id)
+        if len(this_pair) > 1:
+            second_team = MatchHelpers.get_win_loss(this_pair[1].id, this_round.id)
+            first_team.opponent_id = this_pair[1].id
+            second_team.opponent_id = this_pair[0].id
         else:
-            team_score_dict[team_net_score] = [team]
+            first_team.opponent_id = None
 
-    if len(teams) > 0:
-        matched_pairs = pair_teams(team_score_dict)
-        for this_pair in matched_pairs:
-            if len(this_pair) > 1:
-                this_pair[0].opponent_id = this_pair[1].id
-                this_pair[1].opponent_id = this_pair[0].id
     SqlTypes.session.commit()
 
 def pair_teams(team_score_dict):
+    """
+        This function can actually group more than 
+        2 items together.
+    """
     matched_pairs = []
     # iterate through all the teams
     current_pair = []
-    for key,item in team_score_dict.iteritems():
+    for key,item in sorted(team_score_dict.iteritems(), reverse=True):
+        shuffle(item)
         # every team that is seen add to the list
         for team in item:
             current_pair.append(team)
@@ -124,6 +118,8 @@ def pair_teams(team_score_dict):
                 # after adding to the main list
                 matched_pairs.append(list(current_pair))
                 current_pair = []
+    if len(current_pair):
+        matched_pairs.append(current_pair)
 
     return matched_pairs
 
