@@ -36,7 +36,7 @@ class TournaGUI(QtGui.QWidget):
         self.move(300, 300)
         self.setWindowTitle('TournaMaker')
 
-        self.layout = QtGui.QGridLayout()
+        self.layout = QtGui.QHBoxLayout()
 #        self.layout.setSpacing(10)
 
         self.main_tab_widget = QtGui.QTabWidget(self)
@@ -57,6 +57,9 @@ class TournaGUI(QtGui.QWidget):
 
         self.create_tournament_btn = CreateTournamentButton(self)
         self.create_tournament_btn.register_handler_func(self.add_new_tournament)
+
+        self.delete_tournament_btn = QtGui.QPushButton("Delete Tournament")
+        self.delete_tournament_btn.clicked.connect(self.delete_tournament)
 
         # shows all players added to the app
         self.all_player_list_view = QtGui.QListView(self)
@@ -106,7 +109,7 @@ class TournaGUI(QtGui.QWidget):
             else:
                 MessageDialog(self,
                               "Name already {} exists".format(new_player.nickname),
-                              QtGui.QMessageBox.Ok)
+                              QtGui.QMessageBox.Ok).exec_()
 
     def clicked_tournament(self, model_index):
         tournament_name = str(self.tournament_list_model.itemFromIndex(model_index).text())
@@ -114,6 +117,7 @@ class TournaGUI(QtGui.QWidget):
             SqlTypes.session.query(SqlTypes.Tournament).filter(
                 SqlTypes.Tournament.name == tournament_name).first()
         self.show_rounds()
+        self.tab_widget.setCurrentIndex(self.tab_widget.count() - 1)
         round_id = self.tab_widget.currentWidget().round_id
         self.reload_player_list(round_id)
         self.reload_teams(round_id)
@@ -129,8 +133,8 @@ class TournaGUI(QtGui.QWidget):
     def initialize_tabs(self):
         self.tab_widget = QtGui.QTabWidget(self)
         self.tab_widget.currentChanged.connect(self.reload_current_round_tab)
-
         self.show_rounds()
+        self.tab_widget.setCurrentIndex(self.tab_widget.count() - 1)
 
     def reload_current_round_tab(self):
         round_id = self.tab_widget.currentWidget().round_id
@@ -198,14 +202,25 @@ class TournaGUI(QtGui.QWidget):
         return found
 
     def initialize_layout(self):
-        self.layout.addWidget(self.add_player_btn, 1, 1, 1, 1)
-        self.layout.addWidget(self.add_player_list_btn, 1, 2, 1, 1)
-        self.layout.addWidget(self.all_player_list_view, 2, 1, 1, 2)
-        self.layout.addWidget(self.player_info, 3, 1, 2, 2)
-        self.layout.addWidget(self.create_tournament_btn, 1, 3, 1, 1)
-        self.layout.addWidget(self.tournament_list_view, 2, 3, 1, 1)
-        self.layout.addWidget(self.add_round_btn, 3, 3, 1, 1)
-        self.layout.addWidget(self.tab_widget, 4, 3, 3, 1)
+        vert_layout_left = QtGui.QVBoxLayout()
+        vert_layout_left.addWidget(self.add_player_btn)
+        vert_layout_left.addWidget(self.add_player_list_btn)
+        vert_layout_left.addWidget(self.all_player_list_view)
+        vert_layout_left.addWidget(self.player_info)
+        vert_layout_right = QtGui.QVBoxLayout()
+        hor_layout_right = QtGui.QHBoxLayout()
+        hor_layout_right.addWidget(self.create_tournament_btn)
+        hor_layout_right.addWidget(self.delete_tournament_btn)
+        vert_layout_right.addLayout(hor_layout_right)
+        vert_layout_right.addWidget(self.tournament_list_view)
+        vert_layout_right.addWidget(self.add_round_btn)
+        vert_layout_right.addWidget(self.tab_widget)
+        vert_layout_right.setStretchFactor(self.tab_widget, 10)
+        self.layout.addLayout(vert_layout_left)
+        self.layout.addLayout(vert_layout_right)
+
+        self.layout.setStretchFactor(vert_layout_right, 3)
+
         self.setLayout(self.layout)
 
     def get_round_tab(self, this_round_id):
@@ -229,25 +244,43 @@ class TournaGUI(QtGui.QWidget):
     def reload_tournament_list(self):
         self.tournament_list_model.reload(
             SqlTypes.session.query(SqlTypes.Tournament.id, SqlTypes.Tournament.name).all())
+        #choose the first item in the remaining list
+        index = self.tournament_list_model.index(0,0)
+
+        # if an index was found aka if we still have items in the list
+        if index:
+            #set the item as selected
+            self.tournament_list_view.setCurrentIndex(index)
+
+            #set the current selected item
+            item = self.tournament_list_model.itemFromIndex(index)
+            data = item.data(QtCore.Qt.UserRole).toPyObject()
+            self.selected_tournament = SqlTypes.session.query(SqlTypes.Tournament).get(data)
 
     def reload_teams(self, this_round_id):
         # clear old model data and grab updated data from tournament
         data_rows = []
         id_rows = []
         current_round = SqlTypes.session.query(SqlTypes.Round).filter(SqlTypes.Round.id==this_round_id).first()
+        tournament_rounds = SqlTypes.get_rounds_by_tournament_id(current_round.tournament_id)
         # clear existing teams
         current_teams = current_round.teams
 
         for team in current_teams:
             team_list_string = ""
 
-            team_match = MatchHelpers.get_win_loss(team.id, current_round.id)
+            # get win/loss result of current round match-up
+            team_round = MatchHelpers.get_win_loss(team.id, this_round_id)
             opponent_name = ""
-            if (team_match.opponent_id):
-                opponent = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.id==team_match.opponent_id).first()
+            if (team_round.opponent_id):
+                opponent = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.id==team_round.opponent_id).first()
                 opponent_name = opponent.name
 
-            team_round = MatchHelpers.get_win_loss(team.id, this_round_id)
+            win_loss_str = "N/A"
+            if team_round.win_loss == SqlTypes.WinLossEnum.Win:
+                win_loss_str = "Win"
+            elif team_round.win_loss == SqlTypes.WinLossEnum.Lose:
+                win_loss_str = "Lose"
 
             # make the team list string
             for member in team.players:
@@ -256,13 +289,23 @@ class TournaGUI(QtGui.QWidget):
 
                 team_list_string += member.nickname
 
-            win_loss_str = "N/A"
-            if team_round.win_loss == SqlTypes.WinLossEnum.Win:
-                win_loss_str = "Win"
-            elif team_round.win_loss == SqlTypes.WinLossEnum.Lose:
-                win_loss_str = "Lose"
+            # get total stats up until now
+            wins = 0
+            losses = 0
+            byes = 0
+            for this_round in tournament_rounds:
+                if this_round.round_count > current_round.round_count:
+                    continue
 
-            data_rows.append([team.name, team_list_string, opponent_name, win_loss_str])
+                this_match = MatchHelpers.get_win_loss(team.id, this_round.id)
+                if this_match.win_loss == SqlTypes.WinLossEnum.Win:
+                    wins += 1
+                elif this_match.win_loss == SqlTypes.WinLossEnum.Lose:
+                    losses += 1
+                elif this_match.win_loss == SqlTypes.WinLossEnum.NotPlayed:
+                    byes += 1
+
+            data_rows.append([team.name, team_list_string, opponent_name, win_loss_str, "{}/{}/{}".format(wins, losses, byes)])
             id_rows.append(team.id)
 
         self.get_round_tab(this_round_id).teams_reload(id_rows, data_rows)
@@ -300,7 +343,7 @@ class TournaGUI(QtGui.QWidget):
                 if len(row) < 3:
                     MessageDialog(self,
                         "Invalid CSV too few columns: {}".format(row),
-                        QtGui.QMessageBox.Ok)
+                        QtGui.QMessageBox.Ok).exec_()
                     # don't add any changes
                     SqlTypes.session.rollback()
                     return
@@ -331,7 +374,7 @@ class TournaGUI(QtGui.QWidget):
 
             MessageDialog(self,
                 "Names not added (duplicates): \n{}".format(name_string),
-                QtGui.QMessageBox.Ok)
+                QtGui.QMessageBox.Ok).exec_()
 
     def add_new_tournament(self, tournament_name):
         # add if tournament does not exist already
@@ -344,6 +387,14 @@ class TournaGUI(QtGui.QWidget):
             # create a round for this tournament
             SqlTypes.add_new_round(tournament.id)
 
+    def delete_tournament(self):
+        #delete the item from the list
+        box = MessageDialog(self, "Are you sure you want to delete this tournament?", QtGui.QMessageBox.Cancel | QtGui.QMessageBox.Ok)
+        if box.exec_() == QtGui.QMessageBox.Ok:
+            SqlTypes.session.delete(self.selected_tournament)
+            SqlTypes.session.commit()
+            self.reload_tournament_list()
+
     def add_new_round_to_selected_tournament(self):
         round_latest = max(SqlTypes.get_rounds_by_tournament_id(self.selected_tournament.id), key= lambda x: x.round_count)
         current_round_matches = SqlTypes.get_team_rounds_by_round_id(round_latest.id)
@@ -353,7 +404,7 @@ class TournaGUI(QtGui.QWidget):
                 unplayed_matches += 1
 
             if unplayed_matches > 1:
-                MessageDialog(self, "Match results not updated", QtGui.QMessageBox.Ok)
+                MessageDialog(self, "Match results not updated", QtGui.QMessageBox.Ok).exec_()
                 return
 
         SqlTypes.add_new_round(self.selected_tournament.id)

@@ -19,11 +19,6 @@ team_players = Table('team_players', Base.metadata,
         Column('team_id', ForeignKey('teams.id'), primary_key=True),
         Column('player_id', ForeignKey('players.id'), primary_key=True))
 
-#team_rounds = Table('team_rounds', Base.metadata,
-#        Column('team_id', ForeignKey('teams.id'), primary_key=True),
-#        Column('round_id', ForeignKey('rounds.id'), primary_key=True),
-#        Column('win_loss', Integer))
-
 round_players = Table('round_players', Base.metadata,
         Column('player_id', ForeignKey('players.id'), primary_key=True),
         Column('round_id', ForeignKey('rounds.id'), primary_key=True))
@@ -101,12 +96,16 @@ class Tournament(Base):
     teams = relationship(
         'Team',
         secondary=tournament_teams,
-        back_populates='tournaments')
+        back_populates='tournaments',
+        cascade="all, delete, delete-orphan",
+        single_parent=True)
 
     players = relationship(
         'Player',
         secondary=tournament_players,
-        back_populates='tournaments')
+        back_populates='tournaments',
+        cascade="all, delete, delete-orphan",
+        single_parent=True)
 
 
     def __repr__(self):

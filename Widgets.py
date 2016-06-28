@@ -42,17 +42,15 @@ class TeamWinLossWidget(QtGui.QWidget):
         self.win_button.clicked.connect(self.win_click)
         self.lose_button = QtGui.QPushButton("Lose")
         self.lose_button.clicked.connect(self.lose_click)
-        v_layout = QtGui.QVBoxLayout()
-        v_layout.addWidget(self.label)
         h_layout = QtGui.QHBoxLayout()
+        h_layout.addWidget(self.label)
         h_layout.addWidget(self.win_button)
         h_layout.addWidget(self.lose_button)
-        v_layout.addLayout(h_layout)
 
-        self.setLayout(v_layout)
+        self.setLayout(h_layout)
 
     def set_opponent(self, opponent):
-        self.label.setText("Result vs \n Team {}?".format(opponent))
+        self.label.setText("Result vs Team {}?".format(opponent))
 
     def register_win_lose_click(self, func):
         self.clicked_func = func

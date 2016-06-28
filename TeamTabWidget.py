@@ -3,8 +3,9 @@ from model import GenericModel
 from TournamentPlayerWidget import TournamentPlayerWidget
 from Widgets import TeamWinLossWidget
 from CustomDialogs import ManageGroupDialog
-import SqlTypes
 from TeamMaker import generate_teams, match_teams
+import SqlTypes
+import MatchHelpers
 
 class TeamsWidget(QtGui.QWidget):
     def __init__(self, model=None, parent=None, round_id=None, is_first_round=True):
@@ -16,10 +17,9 @@ class TeamsWidget(QtGui.QWidget):
         self.manage_groups_button = None
         self.round_id = round_id
         self.is_first_round = is_first_round
-        teams_tab_layout = QtGui.QGridLayout(self)
 
         #teams model
-        self.teams_model = GenericModel.TableModel(["Name", "Players", "Opponent", "Win/Loss"])
+        self.teams_model = GenericModel.TableModel(["Name", "Players", "Opponent", "Result", "W/L/B"])
         self.teams_view = QtGui.QTableView()
         self.teams_view.setModel(self.teams_model)
         self.teams_view.setSelectionBehavior(QtGui.QAbstractItemView.SelectRows)
@@ -56,14 +56,20 @@ class TeamsWidget(QtGui.QWidget):
 
         self.team_win_loss_handler_func = None
 
-        #add widgets to layout
-        teams_tab_layout.addWidget(self.players_widget, 1, 1, 3, 1)
-        teams_tab_layout.addWidget(self.teams_view, 1, 2, 1, 1)
-        teams_tab_layout.addWidget(self.generate_teams_button, 2, 2)
-        teams_tab_layout.addWidget(self.export_teams_button, 3, 2)
-        teams_tab_layout.addWidget(self.team_win_loss_widget, 1, 3, 3, 1)
+        teams_tab_layout = QtGui.QHBoxLayout()
+        left_vert_layout = QtGui.QVBoxLayout()
+        left_vert_layout.addWidget(self.players_widget)
         if self.manage_groups_button:
-            teams_tab_layout.addWidget(self.manage_groups_button, 4, 1, 1, 1)
+            left_vert_layout.addWidget(self.manage_groups_button)
+        right_vert_layout = QtGui.QVBoxLayout()
+        #add widgets to layout
+        right_vert_layout.addWidget(self.teams_view)
+        right_vert_layout.addWidget(self.team_win_loss_widget)
+        right_vert_layout.addWidget(self.generate_teams_button)
+        right_vert_layout.addWidget(self.export_teams_button)
+        teams_tab_layout.addLayout(left_vert_layout)
+        teams_tab_layout.addLayout(right_vert_layout)
+        teams_tab_layout.setStretchFactor(right_vert_layout, 3)
 
         self.setLayout(teams_tab_layout)
         self.show()
@@ -90,7 +96,7 @@ class TeamsWidget(QtGui.QWidget):
         self.team_clicked_func = func
 
     def manage_groups_clicked(self):
-        all_players = SqlTypes.query_by_round_id(SqlTypes.Player, self.round_id).all()
+        all_players = MatchHelpers.query_by_round_id(SqlTypes.Player, self.round_id).all()
         groups_list = None
         enrolled_players = []
         creation_func = None
@@ -123,10 +129,10 @@ class TeamsWidget(QtGui.QWidget):
         team_id = self.teams_model.data(
             self.teams_view.selectedIndexes()[0], QtCore.Qt.UserRole)
         team = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.id==team_id).first()
-        match = SqlTypes.get_win_loss(team.id, self.round_id)
+        match = MatchHelpers.get_win_loss(team.id, self.round_id)
 
-        this_team_win_loss= SqlTypes.get_win_loss(team_id, self.round_id)
-        opponent_team_win_loss= SqlTypes.get_win_loss(match.opponent_id, self.round_id)
+        this_team_win_loss= MatchHelpers.get_win_loss(team_id, self.round_id)
+        opponent_team_win_loss= MatchHelpers.get_win_loss(match.opponent_id, self.round_id)
 
         if team_won:
             this_team_win_loss.win_loss = SqlTypes.WinLossEnum.Win

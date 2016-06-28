@@ -69,7 +69,7 @@ def generate_teams(this_round_id):
 
     generated_teams = shuffle_and_assign_score_bias(
         5,
-        SqlTypes.get_round_players_groups_tuple(this_round_id),
+        MatchHelpers.get_round_players_groups_tuple(this_round_id),
         2)
 
     # get list that contains a list of 5 SQLType.Players

@@ -9,7 +9,6 @@ class MessageDialog(QtGui.QMessageBox):
         super(MessageDialog, self).__init__(parentWidget)
         self.setText(text)
         self.setStandardButtons(standard_button_mask)
-        self.exec_()
 
 class AddPlayerDialog(QtGui.QDialog):
 
