@@ -246,10 +246,10 @@ class TournaGUI(QtGui.QWidget):
         self.tournament_list_model.reload(
             SqlTypes.session.query(SqlTypes.Tournament.id, SqlTypes.Tournament.name).all())
         #choose the first item in the remaining list
-        index = self.tournament_list_model.index(0,0)
 
         # if an index was found aka if we still have items in the list
-        if index:
+        if self.tournament_list_model.rowCount():
+            index = self.tournament_list_model.index(0,0)
             #set the item as selected
             self.tournament_list_view.setCurrentIndex(index)
 
