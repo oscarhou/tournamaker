@@ -13,6 +13,7 @@ import SqlTypes
 import TeamMaker
 import sys
 import MatchHelpers
+
 class TournaGUI(QtGui.QWidget):
     def __init__(self):
         super(TournaGUI, self).__init__()
