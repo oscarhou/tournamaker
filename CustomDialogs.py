@@ -140,12 +140,12 @@ class QModelSwapper(QtCore.QObject):
         self.swapped.emit()
 
 class ManageGroupDialog(QtGui.QDialog):
-    def __init__(self, item_create_func, round_id, groups, ungrouped_players):
+    def __init__(self, allow_create_groups, round_id, groups, ungrouped_players):
         super(ManageGroupDialog, self).__init__()
         self.groups_list = groups
         self.round_id = round_id
         self.enrolled_players = ungrouped_players
-        self.create_func = item_create_func
+        self.allow_create_groups = allow_create_groups
         # show groups
         self.groups_view = QtGui.QTableView()
         self.groups_model = GenericModel.TableModel(["Players"])
@@ -167,9 +167,12 @@ class ManageGroupDialog(QtGui.QDialog):
         # register buttons to functions
         self.ok_button.clicked.connect(self.ok_clicked)
         self.cancel_button.clicked.connect(self.cancel_clicked)
+
+        # enable button to create groups
         self.create_group_button = QtGui.QPushButton("Create Group")
         self.create_group_button.clicked.connect(self.add_new_group)
-        if not self.create_func:
+        # if we don't allow group creation, disable the button
+        if not self.allow_create_groups:
             self.create_group_button.setEnabled(False)
 
 
@@ -288,7 +291,8 @@ class ManageGroupDialog(QtGui.QDialog):
         # check for added groups in the group list and then add them to the db
         for group in groups_list:
             # empty lists evaluate to false
-            if not group.players:
+            # but only delete if we are allowing groups to be created
+            if not group.players and self.allow_create_groups:
                 SqlTypes.session.delete(group)
                 continue
 
@@ -302,9 +306,11 @@ class ManageGroupDialog(QtGui.QDialog):
     def cancel_clicked(self):
         self.close()
 
+    # this function should never be called if 
+    # group creation is diabled
     def add_new_group(self):
         self.groups_model.add_row(["None"], QtCore.Qt.DisplayRole)
-        self.groups_model.add_row(self.create_func(self.round_id), QtCore.Qt.UserRole)
+        self.groups_model.add_row(SqlTypes.Group(round_id=self.round_id), QtCore.Qt.UserRole)
         # if this is the first group we should select it
         if self.groups_model.rowCount() == 1:
             self.groups_view.selectRow(0)

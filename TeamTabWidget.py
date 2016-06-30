@@ -101,7 +101,6 @@ class TeamsWidget(QtGui.QWidget):
         all_players = MatchHelpers.query_by_round_id(SqlTypes.Player, self.round_id).all()
         groups_list = None
         enrolled_players = []
-        creation_func = None
         if self.is_first_round:
             groups_list = SqlTypes.session.query(SqlTypes.Group).filter(SqlTypes.Group.round_id==self.round_id).all()
             # only show players in the list that are in the round but do not have a team
@@ -113,7 +112,6 @@ class TeamsWidget(QtGui.QWidget):
                         break
                 if not found:
                     enrolled_players.append(player)
-            creation_func = lambda x: SqlTypes.Group(round_id=x)
         else:
             groups_list = SqlTypes.session.query(SqlTypes.Team).filter(SqlTypes.Team.rounds.any(id=self.round_id)).all()
             for player in all_players:
@@ -125,7 +123,7 @@ class TeamsWidget(QtGui.QWidget):
                         break
                 if not found:
                     enrolled_players.append(player)
-        ManageGroupDialog(creation_func, self.round_id, groups_list, enrolled_players).exec_()
+        ManageGroupDialog(self.is_first_round, self.round_id, groups_list, enrolled_players).exec_()
 
     def team_win_loss_clicked(self, team_won):
         team_id = self.teams_model.data(
