@@ -201,13 +201,19 @@ class ManageGroupDialog(QtGui.QDialog):
     # when players list is clicked we need to check the 
     # groups list to see if it currently has room for another player
     def players_list_clicked_handler(self, model_index):
-        # magic fuckin' number
-        if self.group_players_list_model.rowCount() < 5:
-            self.swapper.first_double_clicked(model_index)
-        else:
-            box = QtGui.QMessageBox()
-            box.setText("Max 5 players a team!")
-            box.exec_()
+
+      error_text = None
+      if not len(self.groups_view.selectedIndexes()):
+          error_text = "No team selected"
+      elif self.group_players_list_model.rowCount() >= 5:
+          error_text = "Max 5 players a team!"
+
+      if error_text:
+          box = QtGui.QMessageBox()
+          box.setText(error_text)
+          box.exec_()
+      else:
+          self.swapper.first_double_clicked(model_index)
 
     def get_group_members_string(self, players):
         if len(players):

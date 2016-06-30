@@ -6,6 +6,8 @@ from CustomDialogs import ManageGroupDialog
 from TeamMaker import generate_teams, match_teams
 import SqlTypes
 import MatchHelpers
+from my_utility import TournamentLoader
+
 
 class TeamsWidget(QtGui.QWidget):
     def __init__(self, model=None, parent=None, round_id=None, is_first_round=True):
@@ -156,11 +158,18 @@ class TeamsWidget(QtGui.QWidget):
     def update_team_win_loss(self, opponent):
         self.team_win_loss_widget.set_opponent(opponent)
 
-    def register_export_clicked(self, func):
-        self.export_func = func
-
-    def export_teams(self, func):
+    def export_teams(self):
         name = QtGui.QFileDialog.getSaveFileName(self, 'Export file', 'teams.html')
         if name:
-            self.export_func(name, self.round_id)
+            current_teams = SqlTypes.sql_query(
+                SqlTypes.Team,
+                SqlTypes.Team.rounds.any(id=self.round_id)).all()
+            this_round = SqlTypes.get_by_id(SqlTypes.Round, self.round_id)
+            win_loss_dict = {}
+            # get win loss records for the players
+            for player in this_round.players:
+                win,loss = MatchHelpers.get_player_win_loss(this_round.tournament_id, player.id)
+                win_loss_dict[player.id] = { "player" : player, "win" : win, "loss" : loss}
+
+            TournamentLoader.export_teams_to_file(name, current_teams, win_loss_dict)
 

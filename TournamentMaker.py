@@ -159,7 +159,6 @@ class TournaGUI(QtGui.QWidget):
     # creates a round instance and sets up the callbacks WHICH SUCK
     def setup_round_tab(self,round_id, is_first_round):
         round_tab = TeamsWidget(round_id=round_id, is_first_round=is_first_round)
-        round_tab.register_export_clicked(self.export_team_data)
         round_tab.register_enroll_player_clicked(self.enroll_players)
         round_tab.register_player_export_clicked(self.export_players)
         return round_tab
@@ -310,20 +309,6 @@ class TournaGUI(QtGui.QWidget):
             id_rows.append(team.id)
 
         self.get_round_tab(this_round_id).teams_reload(id_rows, data_rows)
-
-
-    def export_team_data(self, location, round_id):
-        current_teams = SqlTypes.sql_query(
-            SqlTypes.Team,
-            SqlTypes.Team.rounds.any(id=round_id)).all()
-        this_round = SqlTypes.get_by_id(SqlTypes.Round, round_id)
-        win_loss_dict = {}
-        # get win loss records for the players
-        for player in this_round.players:
-            win,loss = SqlTypes.get_player_win_loss(this_round.tournament_id, player.id)
-            win_loss_dict[player.id] = { "player" : player, "win" : win, "loss" : loss}
-
-        TournamentLoader.export_teams_to_file(location, current_teams, win_loss_dict)
 
     def export_players(self, location, round_id):
         current_teams = SqlTypes.sql_query(
