@@ -2,7 +2,7 @@ from PyQt4 import QtGui, QtCore
 from model import GenericModel
 from TournamentPlayerWidget import TournamentPlayerWidget
 from Widgets import TeamWinLossWidget
-from CustomDialogs import ManageGroupDialog
+from CustomDialogs import ManageGroupDialog, MessageDialog
 from TeamMaker import generate_teams, match_teams
 import SqlTypes
 import MatchHelpers
@@ -38,7 +38,7 @@ class TeamsWidget(QtGui.QWidget):
         self.manage_groups_button = QtGui.QPushButton()
         if is_first_round:
             self.generate_teams_button.setText("Generate Teams")
-            self.generate_teams_button.clicked.connect(lambda: generate_teams(self.round_id))
+            self.generate_teams_button.clicked.connect(self.generate_teams_or_error_dialog)
             self.manage_groups_button.setText("Manage Groups")
             self.manage_groups_button.clicked.connect(self.manage_groups_clicked)
         else:
@@ -75,6 +75,13 @@ class TeamsWidget(QtGui.QWidget):
 
         self.setLayout(teams_tab_layout)
         self.show()
+    def generate_teams_or_error_dialog(self):
+        try:
+            generate_teams(self.round_id)
+        except Exception as e:
+            MessageDialog(self,
+                "Error: {}".format(e),
+                QtGui.QMessageBox.Ok).exec_()
 
     def disable_buttons(self):
         self.generate_teams_button.setEnabled(False)

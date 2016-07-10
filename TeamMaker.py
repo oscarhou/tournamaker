@@ -1,4 +1,5 @@
 from random import shuffle
+from CustomDialogs import MessageDialog
 import SqlTypes
 import MatchHelpers
 
@@ -35,6 +36,7 @@ def shuffle_and_assign_score_bias(team_size, players_tuple, min_team_count=1):
 
     # while we still have players/groups
     while len(groups) or len(players):
+        has_progress = False
         # if we have enough players for a team, store the completed team
         # and start a new team
 
@@ -46,16 +48,22 @@ def shuffle_and_assign_score_bias(team_size, players_tuple, min_team_count=1):
                 total_item_list += group.players
                 add_group = group
                 groups.remove(add_group)
+                has_progress = True
                 break
 
         # if no group was found, resort to adding individual players to fill the team
         if add_group == None:
             while len(total_item_list) < team_size and len(players):
                 total_item_list.append(players.pop())
+                has_progress = True
 
         if len(total_item_list) >= team_size:
             total_team_list.append(list(total_item_list))
             total_item_list = []
+
+        # if no progress has been made, then break out
+        if not has_progress:
+            raise Exception("Failed to form teams (try breaking up groups)")
 
     return total_team_list
 
@@ -67,23 +75,26 @@ def generate_teams(this_round_id):
     for team in current_teams:
         SqlTypes.session.delete(team)
 
-    generated_teams = shuffle_and_assign_score_bias(
-        5,
-        MatchHelpers.get_round_players_groups_tuple(this_round_id),
-        2)
+    try:
+        generated_teams = shuffle_and_assign_score_bias(
+            5,
+            MatchHelpers.get_round_players_groups_tuple(this_round_id),
+            2)
 
-    # get list that contains a list of 5 SQLType.Players
-    count = 0
-    for team in generated_teams:
-        # for each team create a record and add it to the current round
-        count += 1
-        new_team = SqlTypes.Team(name=count, players=team, tournament_id=current_round.tournament_id)
-        current_round.teams.append(new_team)
-        SqlTypes.session.add(new_team)
+        # get list that contains a list of 5 SQLType.Players
+        count = 0
+        for team in generated_teams:
+            # for each team create a record and add it to the current round
+            count += 1
+            new_team = SqlTypes.Team(name=count, players=team, tournament_id=current_round.tournament_id)
+            current_round.teams.append(new_team)
+            SqlTypes.session.add(new_team)
 
-    SqlTypes.session.commit()
+        SqlTypes.session.commit()
 
-    match_teams(this_round_id)
+        match_teams(this_round_id)
+    except Exception:
+        raise
 
 def match_teams(this_round_id):
     this_round = SqlTypes.get_by_id(SqlTypes.Round, this_round_id)

@@ -11,17 +11,19 @@ def export_teams_to_file(location, teams, player_info_dict):
         for player in team.players:
             player_data_dict = player_info_dict[player.id]
             player_print_info.append( \
-                (player.nickname, team.name, "{}/{}".format(player_data_dict["win"],player_data_dict["loss"])))
+                (player.nickname, team.name, "{}/{}".format(player_data_dict["win"],player_data_dict["loss"]), "_____"))
             del player_info_dict[player.id]
+    # players without teams
     for key,item in player_info_dict.iteritems():
         player_print_info.append(
             (item["player"].nickname, \
             "Bye", \
-            "{}/{}".format(item["win"],item["loss"])))
+            "{}/{}".format(item["win"],item["loss"]),
+            "_____"))
 
     page.table()
     page.tr()
-    page.th(("Name", "Team", "Win/Loss"))
+    page.th(("Name", "Team", "Win/Loss", "Seat"))
     page.tr.close()
     for sorted_player in sorted(player_print_info, key=lambda item: item[0].lower()):
         page.tr()
